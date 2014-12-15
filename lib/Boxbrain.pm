@@ -129,6 +129,7 @@ class Boxbrain {
             @!current-buffer[$x + ($y * $!max-column)] := @!current-grid[ $x ][ $y ];
         }
 
+        # we will support creating extra buffers
         push @!buffers, @!current-buffer;
         push @!grids, @!current-grid;
     }
@@ -154,10 +155,10 @@ class Boxbrain {
 #    method clear-grid {
 #        for @!current-grid[ $x ].cells -> $c { $c.set( :$x, :char(' ') ) };
 
-    multi method FALLBACK( Str $command-name ) {
-        die "Do not know command $command-name" unless %T::human-controls<<$command-name>>;
-        print %T::human-controls<<$command-name>>;
-    }
+#    multi method FALLBACK( Str $command-name ) {
+#        die "Do not know command $command-name" unless %T::human-controls{$command-name};
+#        print %T::human-controls{$command-name};
+#    }
 
     method clear-screen {
         print %T::human-controls<clear>;
@@ -174,21 +175,21 @@ class Boxbrain {
         self.show-cursor;
     }
 
-#    method pos-cursor-save {
-#        print %T::human-controls<pos-cursor-save>;
-#    }
-#
-#    method pos-cursor-restore {
-#        print %T::human-controls<pos-cursor-restore>;
-#    }
-#
-#    method hide-cursor {
-#        print %T::human-controls<hide-cursor>;
-#    }
-#
-#    method show-cursor {
-#        print %T::human-controls<show-cursor>;
-#    }
+    method pos-cursor-save {
+        print %T::human-controls<pos-cursor-save>;
+    }
+
+    method pos-cursor-restore {
+        print %T::human-controls<pos-cursor-restore>;
+    }
+
+    method hide-cursor {
+        print %T::human-controls<hide-cursor>;
+    }
+
+    method show-cursor {
+        print %T::human-controls<show-cursor>;
+    }
 }
 
 my $b = Boxbrain.new;
@@ -211,9 +212,12 @@ sleep 2;
 
 $b.initialize-screen;
 
+my @hearts;
 for $b.grid-indices -> [$x,$y] {
-    $b[$x][$y] = '♥' if $x+1 %% 2 or $y+1 %% 3;
-    sleep 0.002;
+    do { $b[$x][$y] = '♥'; push @hearts, [$x,$y] } if $x+1 %% 2 or $y+1 %% 3;
+}
+
+for @hearts.pick( +@hearts ) -> [$x,$y] {
     $b[$x][$y].print-cell;
 }
 
