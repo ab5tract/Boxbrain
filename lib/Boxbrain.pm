@@ -46,11 +46,7 @@ module Terminal::Control {
     }
 }
 
-
-print Terminal::Control::tput('sc').perl;
 constant T = ::Terminal::Control;
-say T::tput('rc').perl;
-
 
 class Boxbrain::Cell {
     has $.x is rw;
@@ -88,7 +84,6 @@ class Boxbrain::Column {
         my @cells; for 0..$max-row { @cells[$_] = Boxbrain::Cell.new };
         self.bless( :$max-row, :$column, :@cells );
     }
-
 
     method at_pos( $y ) {
         @!cells[$y];
@@ -152,14 +147,12 @@ class Boxbrain {
         }
     }
 
+# TODO: multiple buffers and grids
 #    method clear-grid {
 #        for @!current-grid[ $x ].cells -> $c { $c.set( :$x, :char(' ') ) };
-
-#    multi method FALLBACK( Str $command-name ) {
-#        die "Do not know command $command-name" unless %T::human-controls{$command-name};
-#        print %T::human-controls{$command-name};
 #    }
 
+    # 'clear' will also work through the FALLBACK
     method clear-screen {
         print %T::human-controls<clear>;
     }
@@ -175,40 +168,30 @@ class Boxbrain {
         self.show-cursor;
     }
 
-    method pos-cursor-save {
-        print %T::human-controls<pos-cursor-save>;
+    multi method FALLBACK( Str $command-name ) {
+        die "Do not know command $command-name" unless %T::human-controls{$command-name};
+        print %T::human-controls{$command-name};
     }
 
-    method pos-cursor-restore {
-        print %T::human-controls<pos-cursor-restore>;
-    }
-
-    method hide-cursor {
-        print %T::human-controls<hide-cursor>;
-    }
-
-    method show-cursor {
-        print %T::human-controls<show-cursor>;
-    }
 }
 
 my $b = Boxbrain.new;
 
-$b.blit;
-#$b.blit("Z");
-#$b.blit("!");
-
-#$b(3,4).perl.say;
-#$b(3,).perl.say;
-
-$b(6,30).char = '$';
-$b(7,30,'*');
-
-$b[6][31] = "%";
-
-$b.blit;
-
-sleep 2;
+#$b.blit;
+##$b.blit("Z");
+##$b.blit("!");
+#
+##$b(3,4).perl.say;
+##$b(3,).perl.say;
+#
+#$b(6,30).char = '$';
+#$b(7,30,'*');
+#
+#$b[6][31] = "%";
+#
+#$b.blit;
+#
+#sleep 2;
 
 $b.initialize-screen;
 
