@@ -154,6 +154,11 @@ class Boxbrain {
 #    method clear-grid {
 #        for @!current-grid[ $x ].cells -> $c { $c.set( :$x, :char(' ') ) };
 
+    multi method FALLBACK( Str $command-name ) {
+        die "Do not know command $command-name" unless %T::human-controls<<$command-name>>;
+        print %T::human-controls<<$command-name>>;
+    }
+
     method clear-screen {
         print %T::human-controls<clear>;
     }
@@ -169,21 +174,21 @@ class Boxbrain {
         self.show-cursor;
     }
 
-    method pos-cursor-save {
-        print %T::human-controls<pos-cursor-save>;
-    }
-
-    method pos-cursor-restore {
-        print %T::human-controls<pos-cursor-restore>;
-    }
-
-    method hide-cursor {
-        print %T::human-controls<hide-cursor>;
-    }
-
-    method show-cursor {
-        print %T::human-controls<show-cursor>;
-    }
+#    method pos-cursor-save {
+#        print %T::human-controls<pos-cursor-save>;
+#    }
+#
+#    method pos-cursor-restore {
+#        print %T::human-controls<pos-cursor-restore>;
+#    }
+#
+#    method hide-cursor {
+#        print %T::human-controls<hide-cursor>;
+#    }
+#
+#    method show-cursor {
+#        print %T::human-controls<show-cursor>;
+#    }
 }
 
 my $b = Boxbrain.new;
