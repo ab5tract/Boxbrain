@@ -19,6 +19,7 @@ module Terminal::Control {
             'hide-cursor'        => 'civis',
             'show-cursor'        => 'cnorm', 
         );
+
         for %human-commands.kv -> $human,$command {
             %tput-controls{$command} = qq:x{ tput $command };
             %human-controls{$human} = %tput-controls{$command};
@@ -27,6 +28,7 @@ module Terminal::Control {
         %attributes = %(
             'columns'       => 'cols',
             'rows'          => 'lines',
+            'lines'         => 'lines',
         );
 
         %attribute-values<columns>  = %*ENV<COLUMNS> //= qq:x{ tput cols };
@@ -105,21 +107,21 @@ class Boxbrain::Grid {
     has $.max-rows;
 
     has @.grid-indices;
-    has Range $.column-range;
-    has Range $.row-range;
+    has @.column-range;
+    has @.row-range;
 
     method new( :$max-columns, :$max-rows ) {
-        my $column-range = 0..^$max-columns;
-        my $row-range = 0..$max-rows;
-        my @grid-indices = ($column-range.values X $row-range.values).map({ [$^x, $^y] });
+        my @column-range = (0..^$max-columns).values;
+        my @row-range = (0..$max-rows).values;
+        my @grid-indices = (@column-range X @row-range).map({ [$^x, $^y] });
 
         my (@grid, @buffer);
-        for $column-range.values -> $x {
+        for @column-range -> $x {
             @grid[ $x ] //= Boxbrain::Column.new( :$max-rows, column => $x );
             for @grid[ $x ].cells.kv -> $y, $cell {
                 $cell.x = $x;
                 $cell.y = $y;
-                $cell.char = 'U';  # TODO: clear-buffer
+                $cell.char = '3';  # TODO: self.clear-buffer / move this where it belongs
             }
         }
 
@@ -128,12 +130,12 @@ class Boxbrain::Grid {
         }
 
         self.bless( :$max-columns, :$max-rows, :@grid-indices,
-                    :$column-range, :$row-range, :@grid, :@buffer );
+                    :@column-range, :@row-range, :@grid, :@buffer );
     }
 
-#    method at_pos( $column ) {
-#        @!grid[ $column ];
-#    }
+    method at_pos( $column ) {
+        @!grid[ $column ];
+    }
 }
 
 
@@ -161,7 +163,7 @@ class Boxbrain {
         $!current-grid = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
         @!grid-indices = $!current-grid.grid-indices;
 
-        $!current-buffer = self!bind-buffer( $!current-grid );
+        $!current-buffer := self!bind-buffer( $!current-grid );
 
         # we will support creating extra buffers
         push @!buffers, $!current-buffer;
@@ -178,7 +180,7 @@ class Boxbrain {
 
     method add-grid( $name? ) {
         my $new-grid    = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
-        my $new-buffer  = self!bind-buffer( $new-grid );
+        my $new-buffer := self!bind-buffer( $new-grid );
         push @!grids, $new-grid;
         push @!buffers, $new-buffer;
 
@@ -205,9 +207,11 @@ class Boxbrain {
         @!buffers[$buffer-index].buffer;
     }
 
-    method blit( $grid-identifier? ) {
-        $grid-identifier ?? do say [~] .buffer( $grid-identifier )
-                         !! do say [~] $!current-buffer.map: { .char } ;
+    method blit( $grid-identifier = 0 ) {
+        say [~] .buffer( $grid-identifier ).map: { .char };
+
+#        $grid-identifier ?? do say [~] .buffer( $grid-identifier ).map: { .char }
+#                         !! do say [~] $!current-buffer.map: { .char } ;
     }
 
     method at_pos( $column ) {
@@ -288,12 +292,32 @@ for $b.grid-indices -> [$x,$y] {
     }
 }
 
-for @hearts.pick( +@hearts ) -> [$x,$y] {
-    $b[$x][$y].print-cell;
-    sleep 0.005;
+$b.add-grid;
+
+for $b.grid-indices -> [$x,$y] {
+    next if $x ~~ 0 or $y ~~ $b.max-rows;
+    if $x %% 3 and $y+1 %% 3 {
+        $b.grid(0)[$x-1][$y+1] = colored('5', @colors.roll);
+        push @hearts, [$x,$y];
+    }
 }
 
-sleep 4;
+for @hearts.pick( +@hearts ) -> [$x,$y] {
+    $b[$x][$y].print-cell;
+#    sleep 0.005;
+}
+
+$b.blit(1);
+sleep 1.5;
+$b.blit;
+sleep 1.5;
+$b.blit(1);
+sleep 1.5;
+$b.blit;
+sleep 1.5;
+
+
+#sleep 4;
 
 $b.shutdown-screen;
 
