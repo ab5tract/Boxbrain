@@ -20,8 +20,8 @@ module Terminal::Control {
             'show-cursor'        => 'cnorm', 
         );
         for %human-commands.kv -> $human,$command {
-            %tput-controls<<$command>> = qq:x{ tput $command };
-            %human-controls<<$human>> = %tput-controls<<$command>>;
+            %tput-controls{$command} = qq:x{ tput $command };
+            %human-controls{$human} = %tput-controls{$command};
         }
 
         %attributes = %(
@@ -40,11 +40,12 @@ module Terminal::Control {
 
     our sub tput( Str $command ) {
         die "Not a supported (or perhaps even valid) tput command"
-            unless %tput-controls<<$command>>;
+            unless %tput-controls{$command};
 
-        %tput-controls<<$command>>;
+        %tput-controls{$command};
     }
 }
+
 
 constant T = ::Terminal::Control;
 
@@ -78,12 +79,13 @@ class Boxbrain::Cell {
 class Boxbrain::Column {
     has @.cells is rw;
     has $.column;
-    has $!max-row;
+    has $!max-rows;
 
-    method new( :$max-row, :$column ) {
-        my @cells; for 0..$max-row { @cells[$_] = Boxbrain::Cell.new };
-        self.bless( :$max-row, :$column, :@cells );
+    method new( :$max-rows, :$column ) {
+        my @cells; for 0..$max-rows { @cells[$_] = Boxbrain::Cell.new };
+        self.bless( :$max-rows, :$column, :@cells );
     }
+
 
     method at_pos( $y ) {
         @!cells[$y];
@@ -95,55 +97,89 @@ class Boxbrain::Column {
 
 }
 
+class Boxbrain::Grid {
+    has @.grid;
+    has @.buffer;
+
+    has $.max-columns;
+    has $.max-rows;
+
+    has @.grid-indices;
+    has Range $.column-range;
+    has Range $.row-range;
+
+    method new( :$max-columns, :$max-rows ) {
+        my $column-range = 0..^$max-columns;
+        my $row-range = 0..$max-rows;
+        my @grid-indices = ($column-range.values X $row-range.values).map({ [$^x, $^y] });
+
+        my (@grid, @buffer);
+        for $column-range.values -> $x {
+            @grid[ $x ] //= Boxbrain::Column.new( :$max-rows, column => $x );
+            for @grid[ $x ].cells.kv -> $y, $cell {
+                $cell.x = $x;
+                $cell.y = $y;
+                $cell.char = 'U';  # TODO: clear-buffer
+            }
+        }
+
+        for @grid-indices -> [$x,$y] {
+            @buffer[$x + ($y * $max-columns)] := @grid[ $x ][ $y ];
+        }
+
+        self.bless( :$max-columns, :$max-rows, :@grid-indices,
+                    :$column-range, :$row-range, :@grid, :@buffer );
+    }
+
+#    method at_pos( $column ) {
+#        @!grid[ $column ];
+#    }
+}
+
+
 class Boxbrain {
-    has @!current-buffer;
-    has @!current-grid;
+    has $!current-buffer;
+    has $!current-grid;
 
     has @!buffers;
     has @!grids;
 
     has @.grid-indices;
-    has $.max-column;
-    has $.max-row;
+    has $.max-columns;
+    has $.max-rows;
 
     method new( *@args ) {
         self.bless(@args);
     }
 
     submethod BUILD {
-        $!max-column = %T::attribute-values<columns>;
-        $!max-row = %T::attribute-values<rows>; 
-        @!grid-indices = (0..^$!max-column X 0..$!max-row).map({ [$^c, $^r] });
+        $!max-columns = +%T::attribute-values<columns>;
+        $!max-rows = +%T::attribute-values<rows>;
 
-        for 0..^$!max-column -> $x {
-            @!current-grid[ $x ] //= Boxbrain::Column.new( :$!max-row, column => $x );
-            for @!current-grid[ $x ].cells.kv -> $i,$c { $c.x = $x; $c.y = $i; $c.char = ' '; };
-        }
+        $!current-grid = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
 
-        for @!grid-indices -> [$x,$y] {
-            @!current-buffer[$x + ($y * $!max-column)] := @!current-grid[ $x ][ $y ];
-        }
+        @!grid-indices := $!current-grid.grid-indices.values;
 
         # we will support creating extra buffers
-        push @!buffers, @!current-buffer;
-        push @!grids, @!current-grid;
+        push @!buffers, $!current-buffer;
+        push @!grids, $!current-grid;
     }
 
     method blit( $store = False ) {
-        say [~] @!current-buffer.map: { .char };
+        say [~] $!current-buffer.map: { .char };
     }
 
     method at_pos( $column ) {
-        @!current-grid[ $column ];
+        $!current-grid.grid[ $column ];
     }
 
     method postcircumfix:<( )> ($t) {
         die "Can only specify x, y, and char" if @$t > 3;
         my ($x,$y,$char) = @$t;
         given +@$t {
-            when 3 { @!current-grid[ $x ][ $y ] = $char }
-            when 2 { @!current-grid[ $x ][ $y ] }
-            when 1 { @!current-grid[ $x ] }
+            when 3 { $!current-grid[ $x ][ $y ] = $char }
+            when 2 { $!current-grid[ $x ][ $y ] }
+            when 1 { $!current-grid[ $x ] }
         }
     }
 
@@ -175,8 +211,6 @@ class Boxbrain {
 
 }
 
-my $b = Boxbrain.new;
-
 #$b.blit;
 ##$b.blit("Z");
 ##$b.blit("!");
@@ -185,7 +219,8 @@ my $b = Boxbrain.new;
 ##$b(3,).perl.say;
 #
 #$b(6,30).char = '$';
-#$b(7,30,'*');
+
+#    $b(7,30,'*');
 #
 #$b[6][31] = "%";
 #
@@ -193,15 +228,28 @@ my $b = Boxbrain.new;
 #
 #sleep 2;
 
+
+#$b.grid-indices.perl.say;
+
+use Term::ANSIColor;
+my @colors = <red magenta yellow white>;
+
+my $b = Boxbrain.new;
+
 $b.initialize-screen;
 
 my @hearts;
 for $b.grid-indices -> [$x,$y] {
-    do { $b[$x][$y] = '♥'; push @hearts, [$x,$y] } if $x+1 %% 2 or $y+1 %% 3;
+    next if $x ~~ 0;
+    if $x %% 3 and $y+1 %% 3 {
+        $b[$x][$y] = colored('♥', @colors.roll);
+        push @hearts, [$x,$y];
+    }
 }
 
 for @hearts.pick( +@hearts ) -> [$x,$y] {
     $b[$x][$y].print-cell;
+    sleep 0.005;
 }
 
 sleep 4;
