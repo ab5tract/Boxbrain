@@ -145,6 +145,8 @@ class Boxbrain {
     has @!grids;
 
     has @.grid-indices;
+    has %!grid-map;
+
     has $.max-columns;
     has $.max-rows;
 
@@ -153,20 +155,59 @@ class Boxbrain {
     }
 
     submethod BUILD {
-        $!max-columns = +%T::attribute-values<columns>;
-        $!max-rows = +%T::attribute-values<rows>;
+        $!max-columns   = +%T::attribute-values<columns>;
+        $!max-rows      = +%T::attribute-values<rows>;
 
         $!current-grid = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
+        @!grid-indices = $!current-grid.grid-indices;
 
-        @!grid-indices := $!current-grid.grid-indices.values;
+        $!current-buffer = self!bind-buffer( $!current-grid );
 
         # we will support creating extra buffers
         push @!buffers, $!current-buffer;
         push @!grids, $!current-grid;
     }
 
-    method blit( $store = False ) {
-        say [~] $!current-buffer.map: { .char };
+    method !bind-buffer( Boxbrain::Grid $grid ) {
+        my $new-buffer = [];
+        for $grid.grid-indices -> [$x,$y] {
+            $new-buffer[$x + ($y * $!max-rows)] := $grid[$x][$y];
+        }
+        $new-buffer;
+    }
+
+    method add-grid( $name? ) {
+        my $new-grid    = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
+        my $new-buffer  = self!bind-buffer( $new-grid );
+        push @!grids, $new-grid;
+        push @!buffers, $new-buffer;
+
+        if $name {
+            %!grid-map{$name} = ^@!grids;
+        }
+    }
+
+    multi method grid( Int $index ) {
+        @!grids[$index].grid;
+    }
+
+    multi method grid( Str $name ) {
+        die "No grid has been named $name" unless my $grid-index = %!grid-map{$name};
+        @!grids[$grid-index].grid;
+    }
+
+    multi method buffer( Int $index ) {
+        @!buffers[$index].buffer;
+    }
+
+    multi method buffer( Str $name ) {
+        die "No buffer has been named $name" unless my $buffer-index = %!grid-map{$name};
+        @!buffers[$buffer-index].buffer;
+    }
+
+    method blit( $grid-identifier? ) {
+        $grid-identifier ?? do say [~] .buffer( $grid-identifier )
+                         !! do say [~] $!current-buffer.map: { .char } ;
     }
 
     method at_pos( $column ) {
