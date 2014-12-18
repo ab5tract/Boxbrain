@@ -141,10 +141,10 @@ class Boxbrain::Grid {
 
 class Boxbrain {
     has $!current-buffer;
-    has $!current-grid;
+    has Boxbrain::Grid $!current-grid;
 
     has @!buffers;
-    has @!grids;
+    has Boxbrain::Grid @!grids;
 
     has @.grid-indices;
     has %!grid-map;
@@ -152,34 +152,46 @@ class Boxbrain {
     has $.max-columns;
     has $.max-rows;
 
-    method new( *@args ) {
-        self.bless(@args);
+    method new {
+        my $max-columns   = +%T::attribute-values<columns>;
+        my $max-rows      = +%T::attribute-values<rows>;
+
+        my $grid = Boxbrain::Grid.new( :$max-columns, :$max-rows );
+        my @grid-indices = $grid.grid-indices;
+
+        self!bind-buffer( $grid, my $buffer = [] );
+
+        self.bless(
+                    :$max-columns, :$max-rows, :@grid-indices,
+                        current-grid    => $grid,
+                        current-buffer  => $buffer
+                  );
     }
 
-    submethod BUILD {
-        $!max-columns   = +%T::attribute-values<columns>;
-        $!max-rows      = +%T::attribute-values<rows>;
+    submethod BUILD( :$current-grid, :$current-buffer, :$max-columns, :$max-rows, :@grid-indices ) {
+        push @!buffers, $current-buffer;
+        push @!grids, $current-grid;
 
-        $!current-grid = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
-        @!grid-indices = $!current-grid.grid-indices;
+        $!current-grid   := @!grids[0];
+        $!current-buffer := @!buffers[0];
 
-        self!bind-buffer( $!current-grid, $!current-buffer = [] );
-
-        # we will support creating extra buffers
-        push @!buffers, $!current-buffer;
-        push @!grids, $!current-grid;
+        # this part feels like it should be unnecessary
+        $!max-columns = $max-columns;
+        $!max-rows = $max-rows;
+        @!grid-indices = @grid-indices;  # TODO: bind this to @!grids[0].grid-indices?
     }
 
-    method !bind-buffer( Boxbrain::Grid $grid, $new-buffer ) {
+    method !bind-buffer( $grid, $new-buffer is rw ) {
         for $grid.grid-indices -> [$x,$y] {
-            $new-buffer[$x + ($y * $!max-rows)] := $grid[$x][$y];
+            $new-buffer[$x + ($y * $grid.max-rows)] := $grid[$x][$y];
         }
-        return $new-buffer;
     }
 
     method add-grid( $name? ) {
-        my $new-grid    = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
+        my $new-grid = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
+
         self!bind-buffer( $new-grid, my $new-buffer = [] );
+
         push @!grids, $new-grid;
         push @!buffers, $new-buffer;
 
@@ -190,7 +202,7 @@ class Boxbrain {
 
     method blit( $grid-identifier = 0 ) {
         my $screen-string = [~] self.buffer( $grid-identifier ).map: { .char };
-        self.clear;
+        self.clear-screen;
         print T::cursor_to(0,0);
         print $screen-string;
     }
@@ -248,7 +260,7 @@ class Boxbrain {
     #    one). The name is optionally supplied when calling .add-grid.
     #
     #    In the case of @!grids, we pass back the grid array directly from the
-    #    Boxbrain::Grid object, actually notching both DWIM and DRY in one swoop.
+    #    Boxbrain::Grid object, actually notching both DWIM and DRY in one swoosh.
     multi method grid( Int $index ) {
         @!grids[$index].grid;
     }
@@ -268,25 +280,6 @@ class Boxbrain {
     }
 }
 
-#$b.blit;
-##$b.blit("Z");
-##$b.blit("!");
-#
-##$b(3,4).perl.say;
-##$b(3,).perl.say;
-#
-#$b(6,30).char = '$';
-
-#    $b(7,30,'*');
-#
-#$b[6][31] = "%";
-#
-#$b.blit;
-#
-#sleep 2;
-
-
-#$b.grid-indices.perl.say;
 
 use Term::ANSIColor;
 my @colors = <red magenta yellow white>;
@@ -314,7 +307,7 @@ for @hearts.pick( +@hearts ) -> [$x,$y] {
 #    sleep 0.005;   # longer hug
 }
 
-$b.blit(1);
+$b.blit("5s");
 sleep 0.5;
 $b.blit;
 sleep 0.5;
