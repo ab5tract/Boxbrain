@@ -2,7 +2,7 @@ use v6;
 
 my constant DEBUG = 1;
 
-module Terminal::Control {
+module Terminal::Print {
     our %human-commands;
     our %human-controls;
     our %tput-controls;
@@ -49,7 +49,7 @@ module Terminal::Control {
 }
 
 
-constant T = ::Terminal::Control;
+constant T = ::Terminal::Print;
 
 class Boxbrain::Cell {
     has $.x is rw;
@@ -121,7 +121,7 @@ class Boxbrain::Grid {
             for @grid[ $x ].cells.kv -> $y, $cell {
                 $cell.x = $x;
                 $cell.y = $y;
-                $cell.char = '3';  # TODO: self.clear-buffer / move this where it belongs
+                $cell.char = ' ';  # TODO: self.clear-buffer / move this where it belongs
             }
         }
 
@@ -163,75 +163,37 @@ class Boxbrain {
         $!current-grid = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
         @!grid-indices = $!current-grid.grid-indices;
 
-        $!current-buffer := self!bind-buffer( $!current-grid );
+        self!bind-buffer( $!current-grid, $!current-buffer = [] );
 
         # we will support creating extra buffers
         push @!buffers, $!current-buffer;
         push @!grids, $!current-grid;
     }
 
-    method !bind-buffer( Boxbrain::Grid $grid ) {
-        my $new-buffer = [];
+    method !bind-buffer( Boxbrain::Grid $grid, $new-buffer ) {
         for $grid.grid-indices -> [$x,$y] {
             $new-buffer[$x + ($y * $!max-rows)] := $grid[$x][$y];
         }
-        $new-buffer;
+        return $new-buffer;
     }
 
     method add-grid( $name? ) {
         my $new-grid    = Boxbrain::Grid.new( :$!max-columns, :$!max-rows );
-        my $new-buffer := self!bind-buffer( $new-grid );
+        self!bind-buffer( $new-grid, my $new-buffer = [] );
         push @!grids, $new-grid;
         push @!buffers, $new-buffer;
 
         if $name {
-            %!grid-map{$name} = ^@!grids;
+            %!grid-map{$name} = +@!grids-1;
         }
-    }
-
-    multi method grid( Int $index ) {
-        @!grids[$index].grid;
-    }
-
-    multi method grid( Str $name ) {
-        die "No grid has been named $name" unless my $grid-index = %!grid-map{$name};
-        @!grids[$grid-index].grid;
-    }
-
-    multi method buffer( Int $index ) {
-        @!buffers[$index].buffer;
-    }
-
-    multi method buffer( Str $name ) {
-        die "No buffer has been named $name" unless my $buffer-index = %!grid-map{$name};
-        @!buffers[$buffer-index].buffer;
     }
 
     method blit( $grid-identifier = 0 ) {
-        say [~] .buffer( $grid-identifier ).map: { .char };
-
-#        $grid-identifier ?? do say [~] .buffer( $grid-identifier ).map: { .char }
-#                         !! do say [~] $!current-buffer.map: { .char } ;
+        my $screen-string = [~] self.buffer( $grid-identifier ).map: { .char };
+        self.clear;
+        print T::cursor_to(0,0);
+        print $screen-string;
     }
-
-    method at_pos( $column ) {
-        $!current-grid.grid[ $column ];
-    }
-
-    method postcircumfix:<( )> ($t) {
-        die "Can only specify x, y, and char" if @$t > 3;
-        my ($x,$y,$char) = @$t;
-        given +@$t {
-            when 3 { $!current-grid[ $x ][ $y ] = $char }
-            when 2 { $!current-grid[ $x ][ $y ] }
-            when 1 { $!current-grid[ $x ] }
-        }
-    }
-
-# TODO: multiple buffers and grids
-#    method clear-grid {
-#        for @!current-grid[ $x ].cells -> $c { $c.set( :$x, :char(' ') ) };
-#    }
 
     # 'clear' will also work through the FALLBACK
     method clear-screen {
@@ -249,11 +211,61 @@ class Boxbrain {
         self.show-cursor;
     }
 
+    # at_pos hands back a Boxbrain::Column
+    #   $b[$x]
+    # Because we have at_pos on the column object as well,
+    # we get
+    #   $b[$x][$y]
+    #
+    # TODO: implement $!current-grid switching
+    method at_pos( $column ) {
+        $!current-grid.grid[ $column ];
+    }
+
+    # at_key returns the Boxbrain::Grid.grid of whichever the key specifies
+    #   $b<specific-grid>[$x][$y]
+    method at_key( $grid-identifier ) {
+        self.grid( $grid-identifier );
+    }
+
+    method postcircumfix:<( )> ($t) {
+        die "Can only specify x, y, and char" if @$t > 3;
+        my ($x,$y,$char) = @$t;
+        given +@$t {
+            when 3 { $!current-grid[ $x ][ $y ] = $char }
+            when 2 { $!current-grid[ $x ][ $y ] }
+            when 1 { $!current-grid[ $x ] }
+        }
+    }
+
     multi method FALLBACK( Str $command-name ) {
         die "Do not know command $command-name" unless %T::human-controls{$command-name};
         print %T::human-controls{$command-name};
     }
 
+    # multi method sugar:
+    #    @!grids and @!buffers can both be accessed by index or name (if it has
+    #    one). The name is optionally supplied when calling .add-grid.
+    #
+    #    In the case of @!grids, we pass back the grid array directly from the
+    #    Boxbrain::Grid object, actually notching both DWIM and DRY in one swoop.
+    multi method grid( Int $index ) {
+        @!grids[$index].grid;
+    }
+
+    multi method grid( Str $name ) {
+        die "No grid has been named $name" unless my $grid-index = %!grid-map{$name};
+        @!grids[$grid-index].grid;
+    }
+
+    multi method buffer( Int $index ) {
+        @!buffers[$index];
+    }
+
+    multi method buffer( Str $name ) {
+        die "No buffer has been named $name" unless my $buffer-index = %!grid-map{$name};
+        @!buffers[$buffer-index];
+    }
 }
 
 #$b.blit;
@@ -283,43 +295,51 @@ my $b = Boxbrain.new;
 
 $b.initialize-screen;
 
+$b.add-grid("5s");
+
 my @hearts;
 for $b.grid-indices -> [$x,$y] {
     next if $x ~~ 0;
     if $x %% 3 and $y+1 %% 3 {
         $b[$x][$y] = colored('♥', @colors.roll);
         push @hearts, [$x,$y];
-    }
-}
-
-$b.add-grid;
-
-for $b.grid-indices -> [$x,$y] {
-    next if $x ~~ 0 or $y ~~ $b.max-rows;
-    if $x %% 3 and $y+1 %% 3 {
-        $b.grid(0)[$x-1][$y+1] = colored('5', @colors.roll);
+        $b<5s>[$x][$y] = colored('5', @colors.roll);
         push @hearts, [$x,$y];
     }
 }
 
+
 for @hearts.pick( +@hearts ) -> [$x,$y] {
     $b[$x][$y].print-cell;
-#    sleep 0.005;
+#    sleep 0.005;   # longer hug
 }
 
 $b.blit(1);
-sleep 1.5;
+sleep 0.5;
 $b.blit;
-sleep 1.5;
+sleep 0.5;
 $b.blit(1);
-sleep 1.5;
+sleep 0.5;
 $b.blit;
-sleep 1.5;
+sleep 0.5;
+$b.blit(1);
+sleep 0.5;
+$b.blit;
+sleep 0.5;
+$b.blit(1);
+sleep 0.5;
+$b.blit;
+sleep 0.5;
+$b.blit(1);
+sleep 0.5;
+$b.blit;
+sleep 0.5;
+$b.blit(1);
+sleep 0.5;
+$b.blit;
+sleep 0.5;
 
 
 #sleep 4;
 
 $b.shutdown-screen;
-
-
-
