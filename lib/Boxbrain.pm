@@ -75,6 +75,10 @@ class Boxbrain::Cell {
         $!print-string //= "{T::cursor_to($!y,$!x)}{$!char}";
         print $!print-string;
     }
+
+    method Str {
+        self.cell-string;
+    }
 }
 
 # make columns a class so that we can do at_pos
@@ -135,6 +139,14 @@ class Boxbrain::Grid {
 
     method at_pos( $column ) {
         @!grid[ $column ];
+    }
+
+    method Str {
+        my $grid-string;
+        for 0..$!max-rows -> $y {
+            $grid-string ~= [~] ~@!grid[$_][$y] for @!column-range;
+        }
+        return $grid-string;
     }
 }
 
@@ -201,10 +213,9 @@ class Boxbrain {
     }
 
     method blit( $grid-identifier = 0 ) {
-        my $screen-string = [~] self.buffer( $grid-identifier ).map: { .char };
         self.clear-screen;
         print T::cursor_to(0,0);
-        print $screen-string;
+        print ~self.grid-object($grid-identifier);
     }
 
     # 'clear' will also work through the FALLBACK
@@ -270,6 +281,17 @@ class Boxbrain {
         @!grids[$grid-index].grid;
     }
 
+    #   Sometimes you simply want the object back (for stringification, or
+    #   introspection on things like column-range)
+    multi method grid-object( Int $index ) {
+        @!grids[$index];
+    }
+
+    multi method grid-object( Str $name ) {
+        die "No grid has been named $name" unless my $grid-index = %!grid-map{$name};
+        @!grids[$grid-index];
+    }
+
     multi method buffer( Int $index ) {
         @!buffers[$index];
     }
@@ -304,7 +326,8 @@ for $b.grid-indices -> [$x,$y] {
 
 for @hearts.pick( +@hearts ) -> [$x,$y] {
     $b[$x][$y].print-cell;
-#    sleep 0.005;   # longer hug
+#    my $range = 0..0.010;
+#    sleep 0.05 + $range.pick;   # longer hug
 }
 
 $b.blit("5s");
