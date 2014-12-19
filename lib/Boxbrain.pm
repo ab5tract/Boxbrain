@@ -214,7 +214,6 @@ class Boxbrain {
 
     method blit( $grid-identifier = 0 ) {
         self.clear-screen;
-        print T::cursor_to(0,0);
         print ~self.grid-object($grid-identifier);
     }
 
