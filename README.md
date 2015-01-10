@@ -8,7 +8,17 @@ At first I thought I might try writing a NativeCall wrapper around ncurses. Then
 
 ## Usage
 
-Right now it will take a bit of work, but the idea is that in the long-term you will be able to specify views either programmatically or through a JSON structure. These views will support async updates from whatever sources one might desire, allowing for quick hacking together of different "command center"-style scripts.
+Right now it only provides a grid with some nice access semantics.
+
+  my $screen = Boxbrain.new;
+  $screen[9][23] = "%";    # one way
+  $screen[9][23];          # returns "%"
+  
+  $screen(9,23,"%");       # another way, designed for golfing
+
+(Note that these are subject to change as the library more fully develops).
+
+But the idea is that in the long-term you will be able to specify views either programmatically or through a JSON structure. These views will support async updates from whatever sources one might desire, allowing for quick hacking together of different "command center"-style scripts.
 
 But if you want to see a pretty display of hearts filling your terminal, just `perl6 Boxbrain.pm` and enjoy. (Even more fun if you set your font size really small ;) ).
 
