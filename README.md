@@ -9,7 +9,7 @@ At first I thought I might try writing a NativeCall wrapper around ncurses. Then
 ## Concept
 _(This code is currently alpha, so a concept statement seems important. If anyone feels like seeing pieces of this come true sooner rather than later, patches are more than welcome.)_
 
-`Boxbrain` hopes to be the first plug-and-play async command line display service. Utilizing terminal-specific escape sequences carefully garnered from the `tput` command, the `Terminal::Print` family (currently implemented only here) will be brought in as a role. This should allow transparent support when shifting between xterm or tmux, for instance.
+`Boxbrain` hopes to be the first plug-and-play async command line display surface. Utilizing terminal-specific escape sequences carefully garnered from the `tput` command, the `Terminal::Print` family (currently implemented only here) will be brought in as a role. This should allow transparent support when shifting between xterm or tmux, for instance.
 
 Hopeful syntax:
 
