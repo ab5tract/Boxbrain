@@ -15,7 +15,7 @@ Hopeful syntax:
 
   `boxbrain --external-config monitors.json`
 
-The config would provide an array of settings hashes that would load into an individual structure like this: `%( :$base-url, :$key, :$query, :$sync-closure, $:sync-trigger, :$geometry)`. The `geometry` setting can be an ad-hoc `details` hash or provide a lookup key for the optional top-level `details` structure.
+The config would provide an array of settings hashes: `{ base-url, key?, query, sync-closure?, sync-trigger, geometry }`. The `geometry` setting can be an ad-hoc `details` hash or provide a lookup key for the optional top-level `details` structure.
 
 A failure to apportion your geometry correctly will be considered a user error, as Perl 6 has native rationals :)
 
