@@ -180,17 +180,13 @@ class Boxbrain {
                   );
     }
 
-    submethod BUILD( :$current-grid, :$current-buffer, :$max-columns, :$max-rows, :@grid-indices ) {
+    submethod BUILD( :$current-grid, :$current-buffer, :$!max-columns, :$!max-rows, :@!grid-indices ) {
+        # TODO: bind grid-indices to @!grids[0].grid-indices?
         push @!buffers, $current-buffer;
         push @!grids, $current-grid;
 
         $!current-grid   := @!grids[0];
         $!current-buffer := @!buffers[0];
-
-        # this part feels like it should be unnecessary
-        $!max-columns = $max-columns;
-        $!max-rows = $max-rows;
-        @!grid-indices = @grid-indices;  # TODO: bind this to @!grids[0].grid-indices?
     }
 
     method !bind-buffer( $grid, $new-buffer is rw ) {
